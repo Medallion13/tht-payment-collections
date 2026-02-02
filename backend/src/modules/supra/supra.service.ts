@@ -70,7 +70,9 @@ export class SupraService {
       });
     }
   }
-
+  /**
+   * Get exchange rate quote
+   */
   async getQuote(amount: number): Promise<Quote> {
     const startTime = Date.now();
     let error: Error | null = null;
@@ -119,4 +121,8 @@ export class SupraService {
       });
     }
   }
+
+  /**
+   * Create the payment
+   */
 }
