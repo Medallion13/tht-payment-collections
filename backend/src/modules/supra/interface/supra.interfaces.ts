@@ -93,6 +93,41 @@ export interface SupraQuoteByIdResponse {
 export type QuoteByIdResponse = SupraQuoteByIdResponse | ErrorResponse;
 
 /**
+ * Supra get pyment by id
+ */
+export interface SupraPaymentStatusResponse {
+  email: string;
+  quoteId: string;
+  currency: string;
+  document: string;
+  documentType: string;
+  payerDocumentId: string;
+  fullName: string;
+  cellPhone: string;
+  payerName: string;
+  description: string;
+  redirectUrl: string;
+  referenceId: string;
+  amount: number; // Decimal (NO factor 100)
+  id: string;
+  status: string;
+  paymentLink: string;
+  createdAt: string;
+}
+
+/**
+ * Supra balances response internal array item and array definition
+ */
+export interface SupraBalanceItem {
+  currency: string;
+  amount: number;
+}
+
+export type SupraBalanceResponse = SupraBalanceItem[];
+
+// ========================= Internal ======================================
+
+/**
  * Internal interface for transformations
  */
 export interface Quote {
@@ -114,4 +149,25 @@ export interface Payment {
   paymentLink: string;
   status: string;
   quoteId: string;
+}
+
+/**
+ * Internal interface for payment status
+ */
+export interface PaymentStatus {
+  paymentId: string;
+  status: string;
+  amount: number;
+  currency: string;
+  fullName: string;
+  email: string;
+  createdAt: string;
+}
+
+/**
+ * Internal interface for balances in this case only filter cop and usd (could be modify)
+ */
+export interface Balances {
+  usd: number;
+  cop: number;
 }
