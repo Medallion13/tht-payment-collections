@@ -65,7 +65,7 @@ describe('Payment flow(E2E)', () => {
     it('Should create a payment with valid user data', async () => {
       // Get the quote
       const quoteRes = await request(app.getHttpServer())
-        .post('/api/aemnpty/quote')
+        .post('/api/payment/quote')
         .send({ amount: 30000 }) // factor 100
         .expect(201);
       const { quoteId } = quoteRes.body as QuoteResponseDto;
@@ -88,7 +88,7 @@ describe('Payment flow(E2E)', () => {
       expect(paymentRes.body).toHaveProperty('paymentLink');
       expect(paymentRes.body).toHaveProperty('status');
 
-      expect(paymentRes.body).toStrictEqual(quoteId);
+      expect(paymentRes.body).toBe(quoteId);
     });
   });
 });
