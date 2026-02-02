@@ -1,6 +1,7 @@
-import { Body, Controller, HttpCode, Post } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, NotFoundException, Param, Post } from '@nestjs/common';
 import { CreatePaymentResponseDto } from './dto/create-payment-response.dto';
 import { CreatePaymentRequestDto } from './dto/create-payment.dto';
+import { PaymentStatusResponseDto } from './dto/payment-status-response.dto';
 import { QuoteRequestDto } from './dto/quote-request.dto';
 import { QuoteResponseDto } from './dto/quote-response.dto';
 import { PaymentService } from './payment.service';
@@ -18,5 +19,20 @@ export class PaymentController {
   @HttpCode(200)
   async createPayment(@Body() dto: CreatePaymentRequestDto): Promise<CreatePaymentResponseDto> {
     return this.paymentService.createPayment(dto);
+  }
+
+  @Get('status/:id')
+  async getPaymentStatus(@Param('id') id: string): Promise<PaymentStatusResponseDto> {
+    try {
+      return await this.paymentService.getPaymentStatus(id);
+    } catch (e) {
+      // for 500 errors
+      // TODO CHECK ERROR MANAGEment
+      console.error(e);
+      if (e instanceof Error && e.name == 'NotFoundError') {
+        throw new NotFoundException(e.message);
+      }
+      throw e;
+    }
   }
 }

@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { SupraService } from '../supra/supra.service';
 import { CreatePaymentResponseDto } from './dto/create-payment-response.dto';
 import { CreatePaymentRequestDto } from './dto/create-payment.dto';
+import { PaymentStatusResponseDto } from './dto/payment-status-response.dto';
 import { QuoteRequestDto } from './dto/quote-request.dto';
 import { QuoteResponseDto } from './dto/quote-response.dto';
 import { QuoteValidation } from './interface/payment.interface';
@@ -159,6 +160,46 @@ export class PaymentService {
             }
           : null,
         duration_ms: Date.now() - startTime,
+        status: error ? 'error' : 'success',
+        error: error ? { message: error.message } : null,
+      });
+    }
+  }
+
+  async getPaymentStatus(paymentId: string): Promise<PaymentStatusResponseDto> {
+    const startTime = Date.now();
+    let error: Error | null = null;
+    let result: PaymentStatusResponseDto | null = null;
+
+    try {
+      const status = await this.supraService.getPaymentStatus(paymentId);
+
+      result = {
+        paymentId: status.paymentId,
+        amount: status.amount,
+        createdAt: status.createdAt,
+        currency: status.currency,
+        email: status.email,
+        fullName: status.fullName,
+        status: status.status,
+      };
+
+      return result;
+    } catch (e) {
+      error = e instanceof Error ? e : new Error(String(e));
+
+      throw error;
+    } finally {
+      this.logger.log({
+        operation: 'getQuote',
+        input: { paymentId },
+        output: result
+          ? {
+              status: result.status,
+              amount: result.amount,
+            }
+          : null,
+        duration: Date.now() - startTime,
         status: error ? 'error' : 'success',
         error: error ? { message: error.message } : null,
       });
