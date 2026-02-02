@@ -334,7 +334,7 @@ export default function QuotePage() {
       </div>
 
       <div className="footer">
-        <a href="/">← Back to Home</a>
+        <Link to="/">← Back to Home</Link>
       </div>
     </div>
   );
