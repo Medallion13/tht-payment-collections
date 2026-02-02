@@ -172,9 +172,7 @@ describe('Payment flow(E2E)', () => {
     });
 
     it('should return 404 for non-existent payment ID', async () => {
-      await request(app.getHttpServer())
-        .get('/api/payment/status/00000000-0000-0000-0000-000000000000')
-        .expect(404);
+      await request(app.getHttpServer()).get('/api/payment/status/notexistvalue').expect(404);
     });
   });
 
