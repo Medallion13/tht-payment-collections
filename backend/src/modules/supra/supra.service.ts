@@ -8,10 +8,12 @@ import {
   AuthResponse,
   ErrorResponse,
   Payment,
+  PaymentStatus,
   Quote,
   QuoteResponse,
   SupraPaymentCreateRequest,
   SupraPaymentCreateResponse,
+  SupraPaymentStatusResponse,
   SupraQuoteByIdResponse,
 } from './interface/supra.interfaces';
 import { SupraMapper } from './supra.mapper';
@@ -266,6 +268,59 @@ export class SupraService {
           ? {
               paymentId: result.paymentId,
               status: result.status,
+            }
+          : null,
+        duration_ms: Date.now() - startTime,
+        status: error ? 'error' : 'success',
+        error: error ? { message: error.message } : null,
+      });
+    }
+  }
+
+  /**
+   * Get the payment by id
+   */
+  async getPaymentStatus(paymentId: string): Promise<PaymentStatus> {
+    const startTime = Date.now();
+    let error: Error | null = null;
+    let result: PaymentStatus | null = null;
+
+    try {
+      const token = await this.getToken();
+
+      const response = await firstValueFrom(
+        this.httpService.get<SupraPaymentStatusResponse>(
+          `${this.apiUrl}/v1/payin/payment/${paymentId}`,
+          {
+            headers: { Authorization: `Bearer ${token}`, 'X-API-TYPE': 'public' },
+          },
+        ),
+      );
+
+      const data = response.data;
+
+      if ('id' in data) {
+        result = SupraMapper.toPaymentStatus(data);
+        return result;
+      }
+
+      throw new Error(`Error getting payment status: ${JSON.stringify(data)}`);
+    } catch (e) {
+      if (e instanceof AxiosError && e.response?.data) {
+        const serverError = e.response.data as ErrorResponse;
+        error = new Error(`Supra API Error: ${serverError.message || e.message}`);
+      } else {
+        error = e instanceof Error ? e : new Error(String(e));
+      }
+      throw e;
+    } finally {
+      this.logger.log({
+        operation: 'getPaymentStatus',
+        input: { paymentId },
+        output: result
+          ? {
+              status: result.status,
+              amount: result.amount,
             }
           : null,
         duration_ms: Date.now() - startTime,
