@@ -55,6 +55,23 @@ export interface SupraPaymentCreateResponse {
 export type PaymentCreateResponse = SupraPaymentCreateResponse | ErrorResponse;
 
 /**
+ * Supra Payment Creation Request
+ */
+export interface SupraPaymentCreateRequest {
+  currency: string;
+  amount: number; // factor 100
+  referenceId: string;
+  documentType: string; // 'CC' | 'NIT' | 'CE' | 'PA'
+  email: string;
+  cellPhone: string;
+  document: string;
+  fullName: string;
+  description: string;
+  redirectUrl: string;
+  quoteId: string;
+}
+
+/**
  * Supra quote by ID response
  */
 export interface SupraQuoteByIdResponse {
@@ -89,17 +106,6 @@ export interface Quote {
 }
 
 /**
- * Internal interface for payment creation
- */
-export interface Payment {
-  userId: string;
-  paymentId: string;
-  paymentLink: string;
-  status: string;
-  quoteId: string;
-}
-
-/**
  * Quote validation result
  */
 export interface QuoteValidation {
@@ -108,4 +114,15 @@ export interface QuoteValidation {
   totalCost: number;
   quote?: SupraQuoteByIdResponse;
   errorMessage?: string;
+}
+
+/**
+ * Internal interface for payment creation
+ */
+export interface Payment {
+  userId: string;
+  paymentId: string;
+  paymentLink: string;
+  status: string;
+  quoteId: string;
 }

@@ -6,8 +6,12 @@ import { firstValueFrom } from 'rxjs';
 import {
   AuthResponse,
   ErrorResponse,
+  Payment,
   Quote,
   QuoteResponse,
+  QuoteValidation,
+  SupraPaymentCreateRequest,
+  SupraPaymentCreateResponse,
   SupraQuoteByIdResponse,
 } from './interface/supra.interfaces';
 import { SupraMapper } from './supra.mapper';
@@ -72,10 +76,47 @@ export class SupraService {
         operation: 'getToken',
         duration_ms: Date.now() - startTime,
         status: error ? 'error' : 'success',
-        error: error ? { message: error.message, stack: error.stack } : null,
+        error: error ? { message: error.message } : null,
       });
     }
   }
+
+  private async validateQuote(quoteId: string): Promise<QuoteValidation> {
+    const startTime = Date.now();
+    let error: Error | null = null;
+
+    try {
+      const quote = await this.getQuoteById(quoteId);
+
+      const now = new Date();
+      const expiresAt = new Date(quote.expiresAt);
+      const isExpired = now > expiresAt;
+
+      const totalCost = quote.finalAmount + quote.transactionCost;
+
+      return {
+        isValid: true,
+        isExpired,
+        totalCost,
+      };
+    } catch (e) {
+      error = e instanceof Error ? e : new Error(String(e));
+      return {
+        isValid: false,
+        isExpired: false,
+        totalCost: 0,
+        errorMessage: e instanceof Error ? e.message : String(e),
+      };
+    } finally {
+      this.logger.log({
+        operation: 'validateQuote',
+        duration_ms: Date.now() - startTime,
+        status: error ? 'error' : 'success',
+        error: error ? { message: error.message } : null,
+      });
+    }
+  }
+
   /**
    * Get exchange rate quote
    */
@@ -131,8 +172,7 @@ export class SupraService {
   /**
    * Get the Quote by ID for validation before creating the payment
    */
-
-  async getQouteById(quoteId: string): Promise<Quote> {
+  async getQuoteById(quoteId: string): Promise<Quote> {
     const startTime = Date.now();
     let result: Quote | null = null;
     let error: Error | null = null;
@@ -186,4 +226,60 @@ export class SupraService {
   /**
    * Create the payment
    */
+  async createPayment(paymentData: SupraPaymentCreateRequest): Promise<Payment> {
+    const startTime = Date.now();
+    let result: Payment | null = null;
+    let error: Error | null = null;
+
+    try {
+      const token = await this.getToken();
+
+      const response = await firstValueFrom(
+        this.httpService.post<SupraPaymentCreateResponse>(
+          `${this.apiUrl}/v1/payin/payment`,
+          paymentData, // Send the request payload
+          {
+            headers: {
+              'X-API-TYPE': 'public',
+              Authorization: `Bearer ${token}`,
+            },
+          },
+        ),
+      );
+
+      const data = response.data;
+
+      if ('id' in data) {
+        result = SupraMapper.toPayment(data);
+        return result;
+      }
+
+      throw new Error(`Error creating payment: ${JSON.stringify(data)}`);
+    } catch (e) {
+      if (e instanceof AxiosError && e.response?.data) {
+        const serverError = e.response.data as ErrorResponse;
+        error = new Error(`Supra API Error: ${serverError.message || e.message}`);
+      } else {
+        error = e instanceof Error ? e : new Error(String(e));
+      }
+      throw error;
+    } finally {
+      this.logger.log('create_payment', {
+        input: {
+          quoteId: paymentData.quoteId,
+          email: paymentData.email,
+          amount: paymentData.amount,
+        },
+        output: result
+          ? {
+              paymentId: result.paymentId,
+              status: result.status,
+            }
+          : null,
+        duration_ms: Date.now() - startTime,
+        status: error ? 'error' : 'success',
+        error: error ? { message: error.message } : null,
+      });
+    }
+  }
 }
