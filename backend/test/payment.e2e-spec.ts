@@ -35,7 +35,7 @@ describe('Payment flow(E2E)', () => {
     it('should return COP amount for valid USD amount', async () => {
       const response = await request(app.getHttpServer())
         .post('/api/payment/quote')
-        .send({ amount: 30000 }) // factor 100
+        .send({ amount: 10000 }) // factor 100
         .expect(201);
 
       // Verify structure
@@ -66,7 +66,7 @@ describe('Payment flow(E2E)', () => {
       // Get the quote
       const quoteRes = await request(app.getHttpServer())
         .post('/api/payment/quote')
-        .send({ amount: 30000 }) // factor 100
+        .send({ amount: 10000 }) // factor 100
         .expect(201);
       const { quoteId } = quoteRes.body as QuoteResponseDto;
 
@@ -88,7 +88,50 @@ describe('Payment flow(E2E)', () => {
       expect(paymentRes.body).toHaveProperty('paymentLink');
       expect(paymentRes.body).toHaveProperty('status');
 
-      expect(paymentRes.body).toBe(quoteId);
+      expect(paymentRes.body.quoteId).toBe(quoteId);
+    });
+
+    it('should reject invalid payment requests', async () => {
+      // Missing quoteId
+      await request(app.getHttpServer())
+        .post('/api/payment/process')
+        .send({
+          fullName: 'John Doe',
+          documentType: 'CC',
+          document: '123456789',
+          email: 'test@example.com',
+          cellPhone: '+575555678987',
+        })
+        .expect(400);
+
+      // Invalid email format
+      await request(app.getHttpServer())
+        .post('/api/payment/process')
+        .send({
+          quoteId: 'some-quote-id',
+          fullName: 'John Doe',
+          documentType: 'CC',
+          document: '123456789',
+          email: 'invalid-email',
+          cellPhone: '+575555678987',
+        })
+        .expect(400);
+
+      // Invalid documentType
+      await request(app.getHttpServer())
+        .post('/api/payment/process')
+        .send({
+          quoteId: 'some-quote-id',
+          fullName: 'John Doe',
+          documentType: 'INVALID',
+          document: '123456789',
+          email: 'test@example.com',
+          cellPhone: '+575555678987',
+        })
+        .expect(400);
+
+      // Empty request
+      await request(app.getHttpServer()).post('/api/payment/process').send({}).expect(400);
     });
   });
 });
