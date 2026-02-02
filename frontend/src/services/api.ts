@@ -2,6 +2,15 @@ import axios from "axios";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
+interface CreatePaymentRequest {
+  quoteId: string;
+  fullName: string;
+  documentType: string;
+  document: string;
+  email: string;
+  cellPhone: string;
+}
+
 const client = axios.create({
   baseURL: API_URL,
   headers: {
@@ -20,6 +29,11 @@ export const api = {
     const response = await client.post("/api/payment/quote", {
       amount: amountFactor,
     });
+    return response.data;
+  },
+
+  createPayment: async (data: CreatePaymentRequest) => {
+    const response = await client.post("/api/payment/process", data);
     return response.data;
   },
 };
