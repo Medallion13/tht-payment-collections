@@ -27,9 +27,7 @@ export class PaymentController {
     try {
       return await this.paymentService.getPaymentStatus(id);
     } catch (e) {
-      // for 500 errors
-      // TODO CHECK ERROR MANAGEment
-      console.error(e);
+      // for not found errors
       if (e instanceof Error && e.name == 'NotFoundError') {
         throw new NotFoundException(e.message);
       }

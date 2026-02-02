@@ -309,8 +309,14 @@ export class SupraService {
       throw new Error(`Error getting payment status: ${JSON.stringify(data)}`);
     } catch (e) {
       if (e instanceof AxiosError && e.response?.data) {
-        const serverError = e.response.data as ErrorResponse;
-        error = new Error(`Supra API Error: ${serverError.message || e.message}`);
+        // manage the 500 errors when the id is not found
+        if (e.response?.status === 500) {
+          error = new Error('Payment not found');
+          error.name = 'NotFoundError';
+          throw error;
+        }
+        const serverError = e.response?.data as ErrorResponse;
+        error = new Error(`Supra API Error: ${serverError?.message || e.message}`);
       } else {
         error = e instanceof Error ? e : new Error(String(e));
       }
