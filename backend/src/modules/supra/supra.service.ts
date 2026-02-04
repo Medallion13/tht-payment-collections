@@ -34,6 +34,7 @@ export class SupraService {
   ) {}
 
   // Get env variables
+  // * MIGRADA
   private get apiUrl(): string {
     return this.configService.getOrThrow<string>('supra.apiUrl');
   }
@@ -70,6 +71,7 @@ export class SupraService {
 
   /**
    * Get exchange rate quote
+   * *MIGRADA
    */
   @LogOperation({ name: 'getQuote' })
   async getQuote(amount: number): Promise<QuoteResponse> {

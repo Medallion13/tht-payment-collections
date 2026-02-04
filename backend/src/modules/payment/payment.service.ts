@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { SupraService } from '../supra/supra.service';
 
 import { LogOperation } from '../../common/decorators/log-operation.decorator';
+import { SupraQuoteService } from '../supra/services/supra-quote.service';
 import { CreatePaymentRequestDto, CreatePaymentResponseDto } from './dto/payment.dto';
 import { QuoteRequestDto, QuoteResponseDto } from './dto/quote.dto';
 import { BalancesResponseDto, PaymentStatusResponseDto } from './dto/status.dto';
@@ -11,12 +12,15 @@ import { QuoteValidation } from './interface/payment.interface';
 export class PaymentService {
   private readonly logger = new Logger(PaymentService.name);
 
-  constructor(private readonly supraService: SupraService) {}
+  constructor(
+    private readonly supraService: SupraService,
+    private readonly supraQuote: SupraQuoteService,
+  ) {}
 
   @LogOperation({ name: 'validateQuote' })
   private async validateQuote(quoteId: string): Promise<QuoteValidation> {
     try {
-      const quote = await this.supraService.getQuoteById(quoteId);
+      const quote = await this.supraQuote.getQuoteById(quoteId);
 
       // check expiration
       const now = new Date();
@@ -45,7 +49,7 @@ export class PaymentService {
 
   @LogOperation({ name: 'getQuote' })
   async getQuote(dto: QuoteRequestDto): Promise<QuoteResponseDto> {
-    const supraQuote = await this.supraService.getQuote(dto.amount);
+    const supraQuote = await this.supraQuote.getQuote(dto.amount);
 
     return {
       quoteId: supraQuote.quoteId,
