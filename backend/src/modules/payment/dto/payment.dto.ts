@@ -1,4 +1,9 @@
-import { CreatePaymentRequest, CreatePaymentResponse, type DocumentType } from '@tht/shared';
+import {
+  CreatePaymentRequest,
+  CreatePaymentResponse,
+  type DocumentType,
+  type PaymentStatus,
+} from '@tht/shared';
 import { IsEmail, IsIn, IsNotEmpty, IsString } from 'class-validator';
 
 export class CreatePaymentRequestDto implements CreatePaymentRequest {
@@ -30,6 +35,6 @@ export class CreatePaymentResponseDto implements CreatePaymentResponse {
   userId: string;
   paymentId: string;
   paymentLink: string;
-  status: string;
+  status: PaymentStatus;
   quoteId: string;
 }

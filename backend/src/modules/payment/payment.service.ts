@@ -123,13 +123,17 @@ export class PaymentService {
       }
 
       // Create payment
-      const payment = await this.supraService.createPayment(dto.quoteId, validation.totalCost, {
-        fullName: dto.fullName,
-        documentType: dto.documentType,
-        document: dto.document,
-        email: dto.email,
-        cellPhone: dto.cellPhone,
-      });
+      const payment = await this.supraService.createPayment(
+        {
+          fullName: dto.fullName,
+          documentType: dto.documentType,
+          document: dto.document,
+          email: dto.email,
+          cellPhone: dto.cellPhone,
+          quoteId: dto.quoteId,
+        },
+        validation.totalCost,
+      );
 
       // Build response for the API
       result = {

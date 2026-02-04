@@ -1,22 +1,26 @@
 import { HttpService } from '@nestjs/axios';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { AxiosError } from 'axios';
+import {
+  AppBalance,
+  CreatePaymentRequest,
+  CreatePaymentResponse,
+  PaymentStatusResponse,
+  QuoteResponse,
+} from '@tht/shared';
+import axios, { AxiosError } from 'axios';
 import { randomUUID } from 'crypto';
 import { firstValueFrom } from 'rxjs';
+
 import {
-  AuthResponse,
-  Balances,
+  AuthSuccess,
   ErrorResponse,
-  Payment,
-  PaymentStatus,
-  Quote,
-  QuoteResponse,
   SupraBalanceResponse,
   SupraPaymentCreateRequest,
   SupraPaymentCreateResponse,
   SupraPaymentStatusResponse,
   SupraQuoteByIdResponse,
+  SupraQuoteResponse,
 } from './interface/supra.interfaces';
 import { SupraMapper } from './supra.mapper';
 
@@ -48,7 +52,7 @@ export class SupraService {
 
     try {
       const response = await firstValueFrom(
-        this.httpService.post<AuthResponse>(
+        this.httpService.post<AuthSuccess>(
           `${this.apiUrl}/v1/auth/token`,
           {
             clientId: this.clientId,
@@ -60,21 +64,16 @@ export class SupraService {
         ),
       );
 
-      const data = response.data;
-
-      if ('token' in data) {
-        return data.token;
-      }
-
-      throw new Error(`Error getting the token: ${JSON.stringify(data)} `);
+      return response.data.token;
     } catch (e) {
-      if (e instanceof AxiosError && e.response?.data) {
+      if (axios.isAxiosError(e) && e.response?.data) {
         const serverError = e.response.data as ErrorResponse;
-        error = new Error(`Supra API Error: ${serverError.message || e.message}`);
+        error = new Error(`Supra Auth Error: ${serverError.message || e.message}`);
       } else {
         error = e instanceof Error ? e : new Error(String(e));
       }
-      throw e;
+
+      throw error;
     } finally {
       this.logger.log({
         operation: 'getToken',
@@ -88,16 +87,17 @@ export class SupraService {
   /**
    * Get exchange rate quote
    */
-  async getQuote(amount: number): Promise<Quote> {
+  async getQuote(amount: number): Promise<QuoteResponse> {
     const startTime = Date.now();
     let error: Error | null = null;
-    let result: Quote | null = null;
+    let result: QuoteResponse | null = null;
+
     try {
       const token = await this.getToken();
       const amountForApi = amount;
 
       const response = await firstValueFrom(
-        this.httpService.post<QuoteResponse>(
+        this.httpService.post<SupraQuoteResponse>(
           `${this.apiUrl}/v1/exchange/quote`,
           {
             initialCurrency: 'USD',
@@ -110,21 +110,19 @@ export class SupraService {
           },
         ),
       );
-      const data = response.data;
-      if ('id' in data) {
-        result = SupraMapper.toQuote(data);
-        return result;
-      }
 
-      throw new Error(`Error creating the quote: ${JSON.stringify(data)}`);
+      result = SupraMapper.toQuote(response.data);
+
+      return result;
     } catch (e) {
-      if (e instanceof AxiosError && e.response?.data) {
+      if (axios.isAxiosError(e) && e.response?.data) {
         const serverError = e.response.data as ErrorResponse;
         error = new Error(`Supra API Error: ${serverError.message || e.message}`);
       } else {
         error = e instanceof Error ? e : new Error(String(e));
       }
-      throw e;
+
+      throw error;
     } finally {
       this.logger.log({
         operation: 'getSupraQuote',
@@ -140,9 +138,9 @@ export class SupraService {
   /**
    * Get the Quote by ID for validation before creating the payment
    */
-  async getQuoteById(quoteId: string): Promise<Quote> {
+  async getQuoteById(quoteId: string): Promise<QuoteResponse> {
     const startTime = Date.now();
-    let result: Quote | null = null;
+    let result: QuoteResponse | null = null;
     let error: Error | null = null;
 
     try {
@@ -159,21 +157,17 @@ export class SupraService {
           },
         ),
       );
-      const data = response.data;
-      if ('id' in data) {
-        result = SupraMapper.toQuoteFromById(data);
-        return result;
-      }
-
-      throw new Error(`Error getting the create quote: ${JSON.stringify(data)}`);
+      result = SupraMapper.toQuoteFromById(response.data);
+      return result;
     } catch (e) {
-      if (e instanceof AxiosError && e.response?.data) {
+      if (axios.isAxiosError(e) && e.response?.data) {
         const serverError = e.response.data as ErrorResponse;
         error = new Error(`Supra API Error: ${serverError.message || e.message}`);
       } else {
         error = e instanceof Error ? e : new Error(String(e));
       }
-      throw e;
+
+      throw error;
     } finally {
       this.logger.log('get_quote_by_id', {
         operation: 'getQuoteById',
@@ -196,18 +190,11 @@ export class SupraService {
    * Create the payment
    */
   async createPayment(
-    quoteId: string,
+    paymentData: CreatePaymentRequest,
     totalCost: number,
-    userData: {
-      fullName: string;
-      documentType: string;
-      document: string;
-      email: string;
-      cellPhone: string;
-    },
-  ): Promise<Payment> {
+  ): Promise<CreatePaymentResponse> {
     const startTime = Date.now();
-    let result: Payment | null = null;
+    let result: CreatePaymentResponse | null = null;
     let error: Error | null = null;
 
     try {
@@ -218,14 +205,14 @@ export class SupraService {
         currency: 'COP',
         amount: totalCost,
         referenceId: randomUUID(),
-        documentType: userData.documentType,
-        email: userData.email,
-        cellPhone: userData.cellPhone,
-        document: userData.document,
-        fullName: userData.fullName,
+        documentType: paymentData.documentType,
+        email: paymentData.email,
+        cellPhone: paymentData.cellPhone,
+        document: paymentData.document,
+        fullName: paymentData.fullName,
         description: 'Collection Payment',
         redirectUrl: 'http://localhost:5173/confirmation',
-        quoteId,
+        quoteId: paymentData.quoteId,
       };
 
       const response = await firstValueFrom(
@@ -241,29 +228,24 @@ export class SupraService {
         ),
       );
 
-      const data = response.data;
+      result = SupraMapper.toPayment(response.data);
 
-      if ('id' in data) {
-        result = SupraMapper.toPayment(data);
-        return result;
-      }
-
-      throw new Error(`Error creating payment: ${JSON.stringify(data)}`);
+      return result;
     } catch (e) {
-      if (e instanceof AxiosError && e.response?.data) {
+      if (axios.isAxiosError(e) && e.response?.data) {
         const serverError = e.response.data as ErrorResponse;
-        console.error(e);
         error = new Error(`Supra API Error: ${serverError.message || e.message}`);
       } else {
         error = e instanceof Error ? e : new Error(String(e));
       }
+
       throw error;
     } finally {
       this.logger.log('create_payment', {
         operation: `createPayment`,
         input: {
-          quoteId,
-          email: userData.email,
+          quoteId: paymentData.quoteId,
+          email: paymentData.email,
           amount: totalCost,
         },
         output: result
@@ -282,10 +264,10 @@ export class SupraService {
   /**
    * Get the payment by id
    */
-  async getPaymentStatus(paymentId: string): Promise<PaymentStatus> {
+  async getPaymentStatus(paymentId: string): Promise<PaymentStatusResponse> {
     const startTime = Date.now();
     let error: Error | null = null;
-    let result: PaymentStatus | null = null;
+    let result: PaymentStatusResponse | null = null;
 
     try {
       const token = await this.getToken();
@@ -299,14 +281,9 @@ export class SupraService {
         ),
       );
 
-      const data = response.data;
+      result = SupraMapper.toPaymentStatus(response.data);
 
-      if ('id' in data) {
-        result = SupraMapper.toPaymentStatus(data);
-        return result;
-      }
-
-      throw new Error(`Error getting payment status: ${JSON.stringify(data)}`);
+      return result;
     } catch (e) {
       if (e instanceof AxiosError && e.response?.data) {
         // manage the 500 errors when the id is not found
@@ -338,10 +315,10 @@ export class SupraService {
     }
   }
 
-  async getBalance(): Promise<Balances> {
+  async getBalance(): Promise<AppBalance> {
     const startTime = Date.now();
     let error: Error | null = null;
-    let result: Balances | null = null;
+    let result: AppBalance | null = null;
 
     try {
       const token = await this.getToken();

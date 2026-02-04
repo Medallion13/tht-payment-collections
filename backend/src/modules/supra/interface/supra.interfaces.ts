@@ -10,7 +10,6 @@ export interface ErrorResponse {
   error: string;
   statusCode: number;
 }
-export type AuthResponse = AuthSuccess | ErrorResponse;
 
 // ============= External API Responses (Raw Data) ================
 
@@ -28,7 +27,6 @@ export interface SupraQuoteResponse {
   transactionCost: number; // factor 100 - always 10 dolars
   exchangeRates: Record<string, number>;
 }
-export type QuoteResponse = SupraQuoteResponse | ErrorResponse;
 
 /**
  * Supra Payment Creation Response
@@ -52,8 +50,6 @@ export interface SupraPaymentCreateResponse {
   id: string; // This is the paymentId
   status: string;
 }
-
-export type PaymentCreateResponse = SupraPaymentCreateResponse | ErrorResponse;
 
 /**
  * Supra Payment Creation Request
@@ -90,8 +86,6 @@ export interface SupraQuoteByIdResponse {
   tokenType: string;
   exchangeRates: Record<string, number>;
 }
-
-export type QuoteByIdResponse = SupraQuoteByIdResponse | ErrorResponse;
 
 /**
  * Supra get pyment by id
