@@ -3,10 +3,20 @@ export type PaymentStatus = "PENDING" | "COMPLETED" | "FAILED";
 
 export interface CreatePaymentRequest {
   quoteId: string;
+  fullName: string;
   documentType: DocumentType;
   document: string;
   email: string;
   cellPhone: string;
+}
+
+export interface CreatePaymentResponse {
+  userId: string;
+  paymentId: string;
+  /** Redirect URL */
+  paymentLink: string;
+  status: PaymentStatus | string;
+  quoteId: string;
 }
 
 export interface PaymentStatusResponse {

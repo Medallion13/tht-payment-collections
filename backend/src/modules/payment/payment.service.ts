@@ -1,11 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { SupraService } from '../supra/supra.service';
-import { BalancesResponseDTO } from './dto/balances-response.dto';
-import { CreatePaymentResponseDto } from './dto/create-payment-response.dto';
-import { CreatePaymentRequestDto } from './dto/create-payment.dto';
-import { PaymentStatusResponseDto } from './dto/payment-status-response.dto';
-import { QuoteRequestDto } from './dto/quote-request.dto';
-import { QuoteResponseDto } from './dto/quote-response.dto';
+
+import { CreatePaymentRequestDto, CreatePaymentResponseDto } from './dto/payment.dto';
+import { QuoteRequestDto, QuoteResponseDto } from './dto/quote.dto';
+import { BalancesResponseDto, PaymentStatusResponseDto } from './dto/status.dto';
 import { QuoteValidation } from './interface/payment.interface';
 
 @Injectable()
@@ -192,7 +190,7 @@ export class PaymentService {
       throw error;
     } finally {
       this.logger.log({
-        operation: 'getQuote',
+        operation: 'getPaymentStatus',
         input: { paymentId },
         output: result
           ? {
@@ -207,10 +205,10 @@ export class PaymentService {
     }
   }
 
-  async getBalances(): Promise<BalancesResponseDTO> {
+  async getBalances(): Promise<BalancesResponseDto> {
     const startTime = Date.now();
     let error: Error | null = null;
-    let result: BalancesResponseDTO | null = null;
+    let result: BalancesResponseDto | null = null;
 
     try {
       const balances = await this.supraService.getBalance();

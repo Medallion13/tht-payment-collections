@@ -1,10 +1,7 @@
 import { Body, Controller, Get, HttpCode, NotFoundException, Param, Post } from '@nestjs/common';
-import { BalancesResponseDTO } from './dto/balances-response.dto';
-import { CreatePaymentResponseDto } from './dto/create-payment-response.dto';
-import { CreatePaymentRequestDto } from './dto/create-payment.dto';
-import { PaymentStatusResponseDto } from './dto/payment-status-response.dto';
-import { QuoteRequestDto } from './dto/quote-request.dto';
-import { QuoteResponseDto } from './dto/quote-response.dto';
+import { CreatePaymentRequestDto, CreatePaymentResponseDto } from './dto/payment.dto';
+import { QuoteRequestDto, QuoteResponseDto } from './dto/quote.dto';
+import { BalancesResponseDto, PaymentStatusResponseDto } from './dto/status.dto';
 import { PaymentService } from './payment.service';
 
 @Controller('api/payment')
@@ -36,7 +33,7 @@ export class PaymentController {
   }
 
   @Get('balances')
-  async getBalances(): Promise<BalancesResponseDTO> {
+  async getBalances(): Promise<BalancesResponseDto> {
     return this.paymentService.getBalances();
   }
 }
