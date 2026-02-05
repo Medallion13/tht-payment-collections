@@ -5,7 +5,7 @@ import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from '../src/app.module';
 import { CreatePaymentResponseDto } from '../src/modules/payment/dto/payment.dto';
-import { QuoteResponseDto } from '../src/modules/payment/dto/quote-response.dto';
+import { QuoteResponseDto } from '../src/modules/payment/dto/quote.dto';
 
 describe('Payment flow(E2E)', () => {
   let app: INestApplication<App>;

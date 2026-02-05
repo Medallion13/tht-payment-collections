@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { SupraService } from '../supra/supra.service';
 
 import { LogOperation } from '../../common/decorators/log-operation.decorator';
+import { SupraPaymentService } from '../supra/services/supra-payment.service';
 import { SupraQuoteService } from '../supra/services/supra-quote.service';
 import { CreatePaymentRequestDto, CreatePaymentResponseDto } from './dto/payment.dto';
 import { QuoteRequestDto, QuoteResponseDto } from './dto/quote.dto';
@@ -15,6 +16,7 @@ export class PaymentService {
   constructor(
     private readonly supraService: SupraService,
     private readonly supraQuote: SupraQuoteService,
+    private readonly supraPayment: SupraPaymentService,
   ) {}
 
   @LogOperation({ name: 'validateQuote' })
@@ -76,7 +78,7 @@ export class PaymentService {
     }
 
     // Create payment
-    const payment = await this.supraService.createPayment(
+    const payment = await this.supraPayment.createPayment(
       {
         fullName: dto.fullName,
         documentType: dto.documentType,
@@ -100,7 +102,7 @@ export class PaymentService {
 
   @LogOperation({ name: 'getPaymentStatus' })
   async getPaymentStatus(paymentId: string): Promise<PaymentStatusResponseDto> {
-    const status = await this.supraService.getPaymentStatus(paymentId);
+    const status = await this.supraPayment.getPaymentStatus(paymentId);
 
     return {
       paymentId: status.paymentId,
