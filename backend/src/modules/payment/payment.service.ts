@@ -14,7 +14,6 @@ export class PaymentService {
   private readonly logger = new Logger(PaymentService.name);
 
   constructor(
-    // private readonly supraService: SupraService,
     private readonly supraQuote: SupraQuoteService,
     private readonly supraPayment: SupraPaymentService,
     private readonly supraBalance: SupraBalanceService,
