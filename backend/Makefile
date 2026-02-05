@@ -7,7 +7,7 @@ lint:
 	pnpm run lint
 
 test:
-	pnpm run test
+	pnpm run test --verbose
 
 test-e2e:
 	pnpm run test:e2e

@@ -1,4 +1,6 @@
 // Supra Auth responses
+
+// =========================== Auth ===============================
 export interface AuthSuccess {
   token: string;
 }
@@ -8,11 +10,9 @@ export interface ErrorResponse {
   error: string;
   statusCode: number;
 }
-export type AuthResponse = AuthSuccess | ErrorResponse;
 
-/**
- * Supra Responses
- */
+// ============= External API Responses (Raw Data) ================
+
 export interface SupraQuoteResponse {
   id: string;
   exchangeConfirmationToken: string;
@@ -27,7 +27,6 @@ export interface SupraQuoteResponse {
   transactionCost: number; // factor 100 - always 10 dolars
   exchangeRates: Record<string, number>;
 }
-export type QuoteResponse = SupraQuoteResponse | ErrorResponse;
 
 /**
  * Supra Payment Creation Response
@@ -49,10 +48,8 @@ export interface SupraPaymentCreateResponse {
   payerName: string;
   paymentLink: string;
   id: string; // This is the paymentId
-  status: string; // 'CREATED'
+  status: string;
 }
-
-export type PaymentCreateResponse = SupraPaymentCreateResponse | ErrorResponse;
 
 /**
  * Supra Payment Creation Request
@@ -90,8 +87,6 @@ export interface SupraQuoteByIdResponse {
   exchangeRates: Record<string, number>;
 }
 
-export type QuoteByIdResponse = SupraQuoteByIdResponse | ErrorResponse;
-
 /**
  * Supra get pyment by id
  */
@@ -124,50 +119,3 @@ export interface SupraBalanceItem {
 }
 
 export type SupraBalanceResponse = SupraBalanceItem[];
-
-// ========================= Internal ======================================
-
-/**
- * Internal interface for transformations
- */
-export interface Quote {
-  quoteId: string;
-  initialCurrency: string;
-  finalAmount: number; // factor 100
-  transactionCost: number; //factor 100
-  finalCurrency: string;
-  exchangeRate: number;
-  expiresAt: string; // 45 seconds from the quote response
-}
-
-/**
- * Internal interface for payment creation
- */
-export interface Payment {
-  userId: string;
-  paymentId: string;
-  paymentLink: string;
-  status: string;
-  quoteId: string;
-}
-
-/**
- * Internal interface for payment status
- */
-export interface PaymentStatus {
-  paymentId: string;
-  status: string;
-  amount: number;
-  currency: string;
-  fullName: string;
-  email: string;
-  createdAt: string;
-}
-
-/**
- * Internal interface for balances in this case only filter cop and usd (could be modify)
- */
-export interface Balances {
-  usd: number;
-  cop: number;
-}

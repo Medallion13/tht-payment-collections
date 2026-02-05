@@ -1,26 +1,28 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { SupraService } from '../supra/supra.service';
-import { BalancesResponseDTO } from './dto/balances-response.dto';
-import { CreatePaymentResponseDto } from './dto/create-payment-response.dto';
-import { CreatePaymentRequestDto } from './dto/create-payment.dto';
-import { PaymentStatusResponseDto } from './dto/payment-status-response.dto';
-import { QuoteRequestDto } from './dto/quote-request.dto';
-import { QuoteResponseDto } from './dto/quote-response.dto';
+
+import { LogOperation } from '../../common/decorators/log-operation.decorator';
+import { SupraBalanceService } from '../supra/services/supra-balance.service';
+import { SupraPaymentService } from '../supra/services/supra-payment.service';
+import { SupraQuoteService } from '../supra/services/supra-quote.service';
+import { CreatePaymentRequestDto, CreatePaymentResponseDto } from './dto/payment.dto';
+import { QuoteRequestDto, QuoteResponseDto } from './dto/quote.dto';
+import { BalancesResponseDto, PaymentStatusResponseDto } from './dto/status.dto';
 import { QuoteValidation } from './interface/payment.interface';
 
 @Injectable()
 export class PaymentService {
   private readonly logger = new Logger(PaymentService.name);
 
-  constructor(private readonly supraService: SupraService) {}
+  constructor(
+    private readonly supraQuote: SupraQuoteService,
+    private readonly supraPayment: SupraPaymentService,
+    private readonly supraBalance: SupraBalanceService,
+  ) {}
 
+  @LogOperation({ name: 'validateQuote' })
   private async validateQuote(quoteId: string): Promise<QuoteValidation> {
-    const startTime = Date.now();
-    let result: QuoteValidation | null = null;
-    let error: Error | null = null;
-
     try {
-      const quote = await this.supraService.getQuoteById(quoteId);
+      const quote = await this.supraQuote.getQuoteById(quoteId);
 
       // check expiration
       const now = new Date();
@@ -30,214 +32,96 @@ export class PaymentService {
       // Get the total cost
       const totalCost = quote.finalAmount + quote.transactionCost;
 
-      result = {
+      return {
         isValid: true,
         isExpired,
         totalCost,
       };
-
-      return result;
     } catch (e) {
-      error = e instanceof Error ? e : new Error(String(e));
+      const error = e instanceof Error ? e : new Error(String(e));
 
-      result = {
+      return {
         isValid: false,
         isExpired: false,
         totalCost: 0,
         errorMessage: error.message,
       };
-
-      return result;
-    } finally {
-      this.logger.log('validate_quote', {
-        operation: 'PaymentService',
-        input: { quoteId },
-        output: result
-          ? {
-              isValid: result.isValid,
-              isExpired: result.isExpired,
-              totalCost: result.totalCost,
-            }
-          : null,
-        duration_ms: Date.now() - startTime,
-        status: error ? 'error' : 'success',
-        error: error ? { message: error.message } : null,
-      });
     }
   }
 
+  @LogOperation({ name: 'getQuote' })
   async getQuote(dto: QuoteRequestDto): Promise<QuoteResponseDto> {
-    const startTime = Date.now();
-    let error: Error | null = null;
-    let result: QuoteResponseDto | null = null;
+    const supraQuote = await this.supraQuote.getQuote(dto.amount);
 
-    try {
-      const supraQuote = await this.supraService.getQuote(dto.amount);
-
-      result = {
-        quoteId: supraQuote.quoteId,
-        initialAmount: dto.amount,
-        finalAmount: supraQuote.finalAmount,
-        transactionCost: supraQuote.transactionCost,
-        exchangeRate: supraQuote.exchangeRate,
-        expiresAt: supraQuote.expiresAt,
-        totalCost: supraQuote.transactionCost + supraQuote.finalAmount,
-      };
-
-      return result;
-    } catch (e) {
-      error = e instanceof Error ? e : new Error(String(e));
-
-      throw error;
-    } finally {
-      this.logger.log({
-        operation: 'getQuote',
-        input: { initialAmount: dto.amount },
-        output: result
-          ? {
-              quoteId: result.quoteId,
-              initialAmout: result.initialAmount,
-              finalAmount: result.finalAmount,
-            }
-          : null,
-        duration: Date.now() - startTime,
-        status: error ? 'error' : 'success',
-        error: error ? { message: error.message } : null,
-      });
-    }
+    return {
+      quoteId: supraQuote.quoteId,
+      initialAmount: dto.amount,
+      finalAmount: supraQuote.finalAmount,
+      transactionCost: supraQuote.transactionCost,
+      exchangeRate: supraQuote.exchangeRate,
+      expiresAt: supraQuote.expiresAt,
+      totalCost: supraQuote.transactionCost + supraQuote.finalAmount,
+    };
   }
 
+  @LogOperation({ name: 'createPayment' })
   async createPayment(dto: CreatePaymentRequestDto): Promise<CreatePaymentResponseDto> {
-    const startTime = Date.now();
-    let result: CreatePaymentResponseDto | null = null;
-    let error: Error | null = null;
+    // Validate the quote
+    const validation = await this.validateQuote(dto.quoteId);
 
-    try {
-      // Validate the quote
-      const validation = await this.validateQuote(dto.quoteId);
+    if (!validation.isValid) {
+      throw new Error(`Invalid quote ID: ${validation.errorMessage || 'Quote not found'}`);
+    }
 
-      if (!validation.isValid) {
-        throw new Error(`Invalid quote ID: ${validation.errorMessage || 'Quote not found'}`);
-      }
+    if (validation.isExpired) {
+      throw new Error('Quote has expired. Please request a new quote.');
+    }
 
-      if (validation.isExpired) {
-        throw new Error('Quote has expired. Please request a new quote.');
-      }
-
-      // Create payment
-      const payment = await this.supraService.createPayment(dto.quoteId, validation.totalCost, {
+    // Create payment
+    const payment = await this.supraPayment.createPayment(
+      {
         fullName: dto.fullName,
         documentType: dto.documentType,
         document: dto.document,
         email: dto.email,
         cellPhone: dto.cellPhone,
-      });
+        quoteId: dto.quoteId,
+      },
+      validation.totalCost,
+    );
 
-      // Build response for the API
-      result = {
-        userId: payment.userId,
-        paymentId: payment.paymentId,
-        paymentLink: payment.paymentLink,
-        status: payment.status,
-        quoteId: payment.quoteId,
-      };
-
-      return result;
-    } catch (e) {
-      error = e instanceof Error ? e : new Error(String(e));
-      throw error;
-    } finally {
-      this.logger.log('create_payment', {
-        operation: 'createPayment',
-        input: {
-          quoteId: dto.quoteId,
-          email: dto.email,
-          fullName: dto.fullName,
-        },
-        output: result
-          ? {
-              paymentId: result.paymentId,
-              status: result.status,
-            }
-          : null,
-        duration_ms: Date.now() - startTime,
-        status: error ? 'error' : 'success',
-        error: error ? { message: error.message } : null,
-      });
-    }
+    // Build response for the API
+    return {
+      userId: payment.userId,
+      paymentId: payment.paymentId,
+      paymentLink: payment.paymentLink,
+      status: payment.status,
+      quoteId: payment.quoteId,
+    };
   }
 
+  @LogOperation({ name: 'getPaymentStatus' })
   async getPaymentStatus(paymentId: string): Promise<PaymentStatusResponseDto> {
-    const startTime = Date.now();
-    let error: Error | null = null;
-    let result: PaymentStatusResponseDto | null = null;
+    const status = await this.supraPayment.getPaymentStatus(paymentId);
 
-    try {
-      const status = await this.supraService.getPaymentStatus(paymentId);
-
-      result = {
-        paymentId: status.paymentId,
-        amount: status.amount,
-        createdAt: status.createdAt,
-        currency: status.currency,
-        email: status.email,
-        fullName: status.fullName,
-        status: status.status,
-      };
-
-      return result;
-    } catch (e) {
-      error = e instanceof Error ? e : new Error(String(e));
-
-      throw error;
-    } finally {
-      this.logger.log({
-        operation: 'getQuote',
-        input: { paymentId },
-        output: result
-          ? {
-              status: result.status,
-              amount: result.amount,
-            }
-          : null,
-        duration: Date.now() - startTime,
-        status: error ? 'error' : 'success',
-        error: error ? { message: error.message } : null,
-      });
-    }
+    return {
+      paymentId: status.paymentId,
+      amount: status.amount,
+      createdAt: status.createdAt,
+      currency: status.currency,
+      email: status.email,
+      fullName: status.fullName,
+      status: status.status,
+    };
   }
 
-  async getBalances(): Promise<BalancesResponseDTO> {
-    const startTime = Date.now();
-    let error: Error | null = null;
-    let result: BalancesResponseDTO | null = null;
+  @LogOperation({ name: 'getBalances' })
+  async getBalances(): Promise<BalancesResponseDto> {
+    const balances = await this.supraBalance.getBalance();
 
-    try {
-      const balances = await this.supraService.getBalance();
-
-      result = {
-        usd: balances.usd,
-        cop: balances.cop,
-      };
-
-      return result;
-    } catch (e) {
-      error = e instanceof Error ? e : new Error(String(e));
-
-      throw error;
-    } finally {
-      this.logger.log({
-        operation: 'getQuote',
-        output: result
-          ? {
-              usd: result.usd,
-              cop: result.cop,
-            }
-          : null,
-        duration: Date.now() - startTime,
-        status: error ? 'error' : 'success',
-        error: error ? { message: error.message } : null,
-      });
-    }
+    return {
+      usd: balances.usd,
+      cop: balances.cop,
+    };
   }
 }
