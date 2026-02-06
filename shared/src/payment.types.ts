@@ -2,6 +2,7 @@ export type DocumentType = "CC" | "NIT" | "CE" | "PA";
 export type PaymentStatus = "PENDING" | "COMPLETED" | "FAILED";
 
 export interface CreatePaymentRequest {
+  orderId: string;
   quoteId: string;
   fullName: string;
   documentType: DocumentType;

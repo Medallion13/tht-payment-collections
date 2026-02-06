@@ -1,10 +1,14 @@
 import { QuoteRequest, QuoteResponse } from '@tht/shared';
-import { IsNumber, IsPositive, Min } from 'class-validator';
+import { IsNotEmpty, IsNumber, IsPositive, IsUUID, Min } from 'class-validator';
 
 /** Minimum amount in factor 100 ($15.00 USD) */
 const MIN_AMOUNT_USD = 1500;
 
 export class QuoteRequestDto implements QuoteRequest {
+  @IsUUID('4', { message: 'orderId must be a valid UUID v4' })
+  @IsNotEmpty()
+  orderId: string;
+
   @IsNumber()
   @IsPositive()
   @Min(MIN_AMOUNT_USD, {

@@ -3,6 +3,7 @@ export interface QuoteRequest {
    * amount to be quoted
    * Be in factor 100
    */
+  orderId: string;
   amount: number;
 }
 
