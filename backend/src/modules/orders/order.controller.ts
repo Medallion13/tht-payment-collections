@@ -3,7 +3,7 @@ import { LogOperation } from '../../common/decorators/log-operation.decorator';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { OrdersService } from './orders.service';
 
-@Controller('orders')
+@Controller('api/orders')
 export class OrdersController {
   constructor(private readonly orderService: OrdersService) {}
 

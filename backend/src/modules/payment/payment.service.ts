@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, Logger, NotFoundException } from '@nes
 
 import { OrderStatus } from '@tht/shared';
 import { LogOperation } from '../../common/decorators/log-operation.decorator';
+import { Order } from '../orders/entities/order.entity';
 import { OrdersService } from '../orders/orders.service';
 import { SupraBalanceService } from '../supra/services/supra-balance.service';
 import { SupraPaymentService } from '../supra/services/supra-payment.service';
@@ -95,7 +96,7 @@ export class PaymentService {
       transactionCost: supraQuote.transactionCost,
       exchangeRate: supraQuote.exchangeRate,
       expiresAt: supraQuote.expiresAt,
-      totalCost: supraQuote.transactionCost,
+      totalCost: supraQuote.totalCost,
     };
   }
 
@@ -114,6 +115,7 @@ export class PaymentService {
 
     // Validate the quote
     const validation = await this.validateQuote(dto.quoteId, order.totalAmountUsd, order.id);
+    const quote = await this.supraQuote.getQuoteById(dto.quoteId, order.id);
 
     if (!validation.isValid) {
       throw new BadRequestException(
@@ -132,6 +134,15 @@ export class PaymentService {
         orderId: order.id,
       },
       validation.totalCost,
+    );
+
+    // Update order values with the payment info
+    // This has to be check at the end
+    await this.ordersService.updateOrderSnapshot(
+      order.id,
+      payment.paymentId,
+      validation.totalCost,
+      quote.exchangeRate,
     );
 
     return {
@@ -156,6 +167,26 @@ export class PaymentService {
       fullName: status.fullName,
       status: status.status,
     };
+  }
+
+  @LogOperation({ name: 'verifyAndFinalizeOrder' })
+  async verifyAndFinalizeOrder(paymentId: string, orderId: string): Promise<Order> {
+    const supraStatus = await this.supraPayment.getPaymentStatus(paymentId);
+    const order = await this.ordersService.findOrderById(orderId);
+    if (!order) throw new NotFoundException('Order Not Found');
+
+    const rate = order.exchangeRate ? order.exchangeRate : 0;
+
+    if (supraStatus.status === 'COMPLETED') {
+      return this.ordersService.finalizeOrderExternal(
+        order.id,
+        paymentId,
+        supraStatus.amount,
+        rate,
+      );
+    }
+
+    return order;
   }
 
   @LogOperation({ name: 'getBalances' })
