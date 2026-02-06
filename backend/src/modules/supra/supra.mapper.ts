@@ -22,6 +22,7 @@ export class SupraMapper {
     const txCost = TRANSACTION_COST_USD * data.exchangeRate;
     const total = data.initialAmount + txCost;
     return {
+      orderId: '',
       quoteId: data.id,
       initialAmount: data.initialAmount,
       finalAmount: data.finalAmount,
@@ -32,16 +33,19 @@ export class SupraMapper {
     };
   }
 
-  static toQuoteFromById(data: SupraQuoteByIdResponse): QuoteResponse {
+  static toQuoteFromById(data: SupraQuoteByIdResponse, orderId: string): QuoteResponse {
     const finalAmt =
       typeof data.finalAmount === 'string' ? parseInt(data.finalAmount, 10) : data.finalAmount;
     const initalAmt =
-      typeof data.initialAmount === 'string' ? parseInt(data.finalAmount, 10) : data.initialAmount;
+      typeof data.initialAmount === 'string'
+        ? parseInt(data.initialAmount, 10)
+        : data.initialAmount;
 
     const txCost = TRANSACTION_COST_USD * data.exchangeRate;
-    const total = initalAmt + txCost;
+    const total = finalAmt + txCost;
 
     return {
+      orderId: orderId,
       quoteId: data.id,
       initialAmount: initalAmt,
       finalAmount: finalAmt,

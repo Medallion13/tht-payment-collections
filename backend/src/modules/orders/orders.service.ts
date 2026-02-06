@@ -91,6 +91,26 @@ export class OrdersService {
     return this.orderRepository.save(order);
   }
 
+  @LogOperation({ name: 'update_order_snapshot' })
+  async updateOrderSnapshot(
+    orderId: string,
+    transactionId: string,
+    totalAmountCop: number,
+    exchangeRate: number,
+  ): Promise<Order> {
+    const order = await this.orderRepository.findOne({ where: { id: orderId } });
+    if (!order) throw new NotFoundException('Order not found');
+
+    order.transactionId = transactionId;
+    order.status = OrderStatus.PENDING;
+    order.exchangeRate = exchangeRate;
+    order.totalAmountCop = Math.trunc(totalAmountCop);
+    order.updatedAt = new Date();
+
+    return this.orderRepository.save(order);
+  }
+
+  @LogOperation({ name: 'finalize_order_external' })
   async finalizeOrderExternal(
     orderId: string,
     transactionId: string,
@@ -107,5 +127,13 @@ export class OrdersService {
     order.updatedAt = new Date();
 
     return this.orderRepository.save(order);
+  }
+
+  @LogOperation({ name: 'find_order_by_id' })
+  async findOrderById(id: string): Promise<Order | null> {
+    return this.orderRepository.findOne({
+      where: { id },
+      relations: ['product'], // to price validation
+    });
   }
 }

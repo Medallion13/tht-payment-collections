@@ -1,6 +1,9 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 
+import { OrderStatus } from '@tht/shared';
 import { LogOperation } from '../../common/decorators/log-operation.decorator';
+import { Order } from '../orders/entities/order.entity';
+import { OrdersService } from '../orders/orders.service';
 import { SupraBalanceService } from '../supra/services/supra-balance.service';
 import { SupraPaymentService } from '../supra/services/supra-payment.service';
 import { SupraQuoteService } from '../supra/services/supra-quote.service';
@@ -17,25 +20,43 @@ export class PaymentService {
     private readonly supraQuote: SupraQuoteService,
     private readonly supraPayment: SupraPaymentService,
     private readonly supraBalance: SupraBalanceService,
+    private readonly ordersService: OrdersService,
   ) {}
 
   @LogOperation({ name: 'validateQuote' })
-  private async validateQuote(quoteId: string): Promise<QuoteValidation> {
+  private async validateQuote(
+    quoteId: string,
+    expectedAmountUsd: number,
+    orderId: string,
+  ): Promise<QuoteValidation> {
     try {
-      const quote = await this.supraQuote.getQuoteById(quoteId);
+      const quote = await this.supraQuote.getQuoteById(quoteId, orderId);
 
+      // Integrity validation
+      if (quote.initialAmount !== expectedAmountUsd) {
+        return {
+          isValid: false,
+          isExpired: false,
+          totalCost: 0,
+          errorMessage: `Quote amount mismatch. Expected: ${expectedAmountUsd}, Received: ${quote.initialAmount}`,
+        };
+      }
       // check expiration
       const now = new Date();
       const expiresAt = new Date(quote.expiresAt);
-      const isExpired = now > expiresAt;
-
-      // Get the total cost
-      const totalCost = quote.finalAmount + quote.transactionCost;
+      if (now > expiresAt) {
+        return {
+          isValid: false,
+          isExpired: true,
+          totalCost: 0,
+          errorMessage: 'The quote has expired',
+        };
+      }
 
       return {
         isValid: true,
-        isExpired,
-        totalCost,
+        isExpired: false,
+        totalCost: quote.totalCost,
       };
     } catch (e) {
       const error = e instanceof Error ? e : new Error(String(e));
@@ -51,46 +72,79 @@ export class PaymentService {
 
   @LogOperation({ name: 'getQuote' })
   async getQuote(dto: QuoteRequestDto): Promise<QuoteResponseDto> {
-    const supraQuote = await this.supraQuote.getQuote(dto.amount);
+    const order = await this.ordersService.findOrderById(dto.orderId);
+
+    if (!order) throw new NotFoundException(`Order with the ID ${dto.orderId} not found`);
+
+    if (order.status !== OrderStatus.PENDING) {
+      throw new BadRequestException(`Order ${dto.orderId} is already ${order.status}`);
+    }
+
+    if (dto.amount !== order.totalAmountUsd) {
+      throw new BadRequestException(
+        `The requested amount does not match the order total ${dto.amount} !== ${order.totalAmountUsd}`,
+      );
+    }
+
+    const supraQuote = await this.supraQuote.getQuote(order.totalAmountUsd);
 
     return {
+      orderId: order.id,
       quoteId: supraQuote.quoteId,
       initialAmount: dto.amount,
       finalAmount: supraQuote.finalAmount,
       transactionCost: supraQuote.transactionCost,
       exchangeRate: supraQuote.exchangeRate,
       expiresAt: supraQuote.expiresAt,
-      totalCost: supraQuote.transactionCost + supraQuote.finalAmount,
+      totalCost: supraQuote.totalCost,
     };
   }
 
   @LogOperation({ name: 'createPayment' })
   async createPayment(dto: CreatePaymentRequestDto): Promise<CreatePaymentResponseDto> {
+    // Recover order
+    const order = await this.ordersService.findOrderById(dto.orderId);
+    if (!order) {
+      throw new NotFoundException(`Order ${dto.orderId} not found`);
+    }
+
+    // Check status of the order
+    if (order.status !== OrderStatus.PENDING) {
+      throw new BadRequestException(`Order ${dto.orderId} is already ${order.status}`);
+    }
+
     // Validate the quote
-    const validation = await this.validateQuote(dto.quoteId);
+    const validation = await this.validateQuote(dto.quoteId, order.totalAmountUsd, order.id);
+    const quote = await this.supraQuote.getQuoteById(dto.quoteId, order.id);
 
     if (!validation.isValid) {
-      throw new Error(`Invalid quote ID: ${validation.errorMessage || 'Quote not found'}`);
+      throw new BadRequestException(
+        `Invalid quote ID: ${validation.errorMessage || 'Quote not found'}`,
+      );
     }
 
     if (validation.isExpired) {
-      throw new Error('Quote has expired. Please request a new quote.');
+      throw new BadRequestException('Quote has expired. Please request a new quote.');
     }
 
-    // Create payment
+    // Creates supra payment resource
     const payment = await this.supraPayment.createPayment(
       {
-        fullName: dto.fullName,
-        documentType: dto.documentType,
-        document: dto.document,
-        email: dto.email,
-        cellPhone: dto.cellPhone,
-        quoteId: dto.quoteId,
+        ...dto,
+        orderId: order.id,
       },
       validation.totalCost,
     );
 
-    // Build response for the API
+    // Update order values with the payment info
+    // This has to be check at the end
+    await this.ordersService.updateOrderSnapshot(
+      order.id,
+      payment.paymentId,
+      validation.totalCost,
+      quote.exchangeRate,
+    );
+
     return {
       userId: payment.userId,
       paymentId: payment.paymentId,
@@ -113,6 +167,26 @@ export class PaymentService {
       fullName: status.fullName,
       status: status.status,
     };
+  }
+
+  @LogOperation({ name: 'verifyAndFinalizeOrder' })
+  async verifyAndFinalizeOrder(paymentId: string, orderId: string): Promise<Order> {
+    const supraStatus = await this.supraPayment.getPaymentStatus(paymentId);
+    const order = await this.ordersService.findOrderById(orderId);
+    if (!order) throw new NotFoundException('Order Not Found');
+
+    const rate = order.exchangeRate ? order.exchangeRate : 0;
+
+    if (supraStatus.status === 'COMPLETED') {
+      return this.ordersService.finalizeOrderExternal(
+        order.id,
+        paymentId,
+        supraStatus.amount,
+        rate,
+      );
+    }
+
+    return order;
   }
 
   @LogOperation({ name: 'getBalances' })

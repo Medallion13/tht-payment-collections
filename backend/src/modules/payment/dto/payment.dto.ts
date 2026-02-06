@@ -4,9 +4,13 @@ import {
   type DocumentType,
   type PaymentStatus,
 } from '@tht/shared';
-import { IsEmail, IsIn, IsNotEmpty, IsString } from 'class-validator';
+import { IsEmail, IsIn, IsNotEmpty, IsString, IsUUID } from 'class-validator';
 
 export class CreatePaymentRequestDto implements CreatePaymentRequest {
+  @IsUUID('4', { message: 'orderId must be a valid UUID v4' })
+  @IsNotEmpty()
+  orderId: string;
+
   @IsString()
   @IsNotEmpty()
   quoteId: string;
